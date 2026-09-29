@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Segmentation | K-Means</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#eef2ff,#f8fafc);color:#1e293b;min-height:100vh}
+.hero{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:white;padding:55px 20px;text-align:center}
+.hero h1{font-size:40px;margin-bottom:12px}.hero p{font-size:18px;opacity:.9}
+.container{max-width:1050px;margin:35px auto;padding:0 20px}
+.card{background:white;border-radius:20px;padding:28px;margin-bottom:25px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+.card h2{margin-bottom:20px;color:#312e81}
+.input-grid{display:grid;grid-template-columns:1fr 1fr;gap:25px}
+label{display:block;font-weight:bold;margin-bottom:10px}
+input[type="number"]{width:100%;padding:14px;border:2px solid #e2e8f0;border-radius:12px;font-size:16px;outline:none}
+input[type="number"]:focus{border-color:#6366f1}
+input[type="range"]{width:100%;accent-color:#4f46e5}
+.score{text-align:center;margin-top:8px;font-size:20px;font-weight:bold;color:#4f46e5}
+button{width:100%;padding:16px;margin-top:25px;border:none;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:white;font-size:17px;font-weight:bold;cursor:pointer;transition:.2s}
+button:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(79,70,229,.3)}
+#result{display:none;margin-top:25px;padding:25px;border-radius:16px;background:#eef2ff;border-left:6px solid #4f46e5}
+#clusterTitle{font-size:27px;font-weight:bold;color:#312e81;margin-bottom:10px}
+#description{font-size:17px;line-height:1.6}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:20px}
+.stat{background:#f8fafc;border-radius:14px;padding:20px;text-align:center}
+.stat h3{color:#64748b;font-size:14px;margin-bottom:8px}.stat p{font-size:22px;font-weight:bold;color:#312e81}
+.cluster-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.cluster-box{padding:25px;border-radius:16px;background:#f8fafc;border:1px solid #e2e8f0}
+.cluster-box h3{color:#4f46e5;margin-bottom:15px}.cluster-box p{line-height:1.7}
+.project-info{line-height:1.8;color:#475569}
+canvas{width:100%;height:360px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}
+footer{text-align:center;padding:30px;color:#64748b}
+@media(max-width:700px){.input-grid,.cluster-grid,.stats{grid-template-columns:1fr}.hero h1{font-size:30px}}
+</style>
+</head>
+<body>
+
+<section class="hero">
+<h1>🛍️ Customer Segmentation</h1>
+<p>Machine Learning • K-Means Clustering • K = 2</p>
+</section>
+
+<div class="container">
+
+<div class="card">
+<h2>🎯 Predict Customer Group</h2>
+<div class="input-grid">
+<div>
+<label>💰 Annual Income (k$)</label>
+<input type="number" id="income" min="0" max="200" value="50">
+</div>
+<div>
+<label>🛒 Spending Score (1-100)</label>
+<input type="range" id="spending" min="1" max="100" value="50">
+<div class="score"><span id="scoreValue">50</span> / 100</div>
+</div>
+</div>
+<button onclick="predictCluster()">🔍 Predict Customer Group</button>
+
+<div id="result">
+<div id="clusterTitle"></div>
+<p id="description"></p>
+<div class="stats">
+<div class="stat"><h3>Annual Income</h3><p id="resultIncome"></p></div>
+<div class="stat"><h3>Spending Score</h3><p id="resultSpending"></p></div>
+<div class="stat"><h3>Nearest Centroid Distance</h3><p id="distance"></p></div>
+</div>
+</div>
+</div>
+
+<div class="card">
+<h2>📊 Cluster Visualization</h2>
+<p class="project-info" style="margin-bottom:15px">
+The graph shows the two K-Means centroids and the new customer's position.
+</p>
+<canvas id="chart" width="950" height="360"></canvas>
+</div>
+
+<div class="card">
+<h2>📌 Cluster Centroids</h2>
+<div class="cluster-grid">
+<div class="cluster-box">
+<h3>🔵 Cluster 0</h3>
+<p><b>Annual Income:</b> 79.60 k$</p>
+<p><b>Spending Score:</b> 50.13</p>
+<p>Higher-income customer group with an average spending score.</p>
+</div>
+<div class="cluster-box">
+<h3>🟣 Cluster 1</h3>
+<p><b>Annual Income:</b> 37.29 k$</p>
+<p><b>Spending Score:</b> 50.29</p>
+<p>Lower-income customer group with an average spending score.</p>
+</div>
+</div>
+</div>
+
+<div class="card">
+<h2>📖 Project Information</h2>
+<p class="project-info">
+This project uses the K-Means clustering algorithm to segment mall customers into two groups.
+The selected features are Annual Income (k$) and Spending Score (1-100).
+Since K = 2, the algorithm forms two customer groups based on similarity to their cluster centroids.
+</p>
+</div>
+
+</div>
+
+<footer>
+Customer Segmentation using K-Means • Machine Learning Project
+</footer>
+
+<script>
+const centroid0={income:79.6,spending:50.127273};
+const centroid1={income:37.288889,spending:50.288889};
+
+const spending=document.getElementById("spending");
+const scoreValue=document.getElementById("scoreValue");
+
+spending.addEventListener("input",()=>{
+scoreValue.textContent=spending.value;
+});
+
+function euclidean(income,score,c){
+return Math.sqrt(Math.pow(income-c.income,2)+Math.pow(score-c.spending,2));
+}
+
+function predictCluster(){
+const income=parseFloat(document.getElementById("income").value);
+const score=parseFloat(document.getElementById("spending").value);
+
+if(isNaN(income)||income<0){
+alert("Please enter a valid annual income.");
+return;
+}
+
+const d0=euclidean(income,score,centroid0);
+const d1=euclidean(income,score,centroid1);
+const cluster=d0<=d1?0:1;
+const d=Math.min(d0,d1);
+
+const title=document.getElementById("clusterTitle");
+const desc=document.getElementById("description");
+
+if(cluster===0){
+title.textContent="🔵 Customer belongs to Cluster 0";
+desc.textContent="This customer is closer to Cluster 0, whose centroid represents a higher annual income group with an average spending score.";
+}else{
+title.textContent="🟣 Customer belongs to Cluster 1";
+desc.textContent="This customer is closer to Cluster 1, whose centroid represents a lower annual income group with an average spending score.";
+}
+
+document.getElementById("resultIncome").textContent=income.toFixed(2)+" k$";
+document.getElementById("resultSpending").textContent=score;
+document.getElementById("distance").textContent=d.toFixed(2);
+document.getElementById("result").style.display="block";
+
+drawChart(income,score,cluster);
+}
+
+function drawChart(newIncome=null,newScore=null,cluster=null){
+const canvas=document.getElementById("chart");
+const ctx=canvas.getContext("2d");
+const w=canvas.width,h=canvas.height;
+ctx.clearRect(0,0,w,h);
+
+const left=70,right=25,top=25,bottom=55;
+const plotW=w-left-right,plotH=h-top-bottom;
+const maxX=120,maxY=100;
+
+function x(v){return left+(v/maxX)*plotW}
+function y(v){return h-bottom-(v/maxY)*plotH}
+
+ctx.strokeStyle="#cbd5e1";
+ctx.lineWidth=1;
+
+for(let i=0;i<=6;i++){
+const xv=i*20;
+ctx.beginPath();ctx.moveTo(x(xv),top);ctx.lineTo(x(xv),h-bottom);ctx.stroke();
+ctx.fillStyle="#64748b";ctx.font="12px Arial";ctx.textAlign="center";
+ctx.fillText(xv,x(xv),h-bottom+20);
+}
+for(let i=0;i<=5;i++){
+const yv=i*20;
+ctx.beginPath();ctx.moveTo(left,y(yv));ctx.lineTo(w-right,y(yv));ctx.stroke();
+ctx.fillStyle="#64748b";ctx.font="12px Arial";ctx.textAlign="right";
+ctx.fillText(yv,left-10,y(yv)+4);
+}
+
+ctx.fillStyle="#334155";ctx.font="bold 14px Arial";ctx.textAlign="center";
+ctx.fillText("Annual Income (k$)",left+plotW/2,h-10);
+ctx.save();ctx.translate(18,top+plotH/2);ctx.rotate(-Math.PI/2);ctx.fillText("Spending Score",0,0);ctx.restore();
+
+function point(px,py,label){
+ctx.beginPath();ctx.arc(x(px),y(py),9,0,Math.PI*2);ctx.fillStyle=label==="C0"?"#2563eb":"#7c3aed";ctx.fill();
+ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.stroke();
+ctx.fillStyle="#1e293b";ctx.font="bold 12px Arial";ctx.textAlign="left";ctx.fillText(label,x(px)+12,y(py)-8);
+}
+
+point(centroid0.income,centroid0.spending,"C0");
+point(centroid1.income,centroid1.spending,"C1");
+
+if(newIncome!==null){
+ctx.beginPath();ctx.arc(x(newIncome),y(newScore),11,0,Math.PI*2);
+ctx.fillStyle="#f59e0b";ctx.fill();
+ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.stroke();
+ctx.fillStyle="#92400e";ctx.font="bold 12px Arial";ctx.textAlign="left";
+ctx.fillText("New Customer",x(newIncome)+14,y(newScore)+4);
+}
+
+ctx.fillStyle="#64748b";ctx.font="12px Arial";ctx.textAlign="left";
+ctx.fillText("C0 = higher-income centroid",80,18);
+ctx.fillText("C1 = lower-income centroid",290,18);
+}
+
+drawChart();
+</script>
+
+</body>
+</html>
